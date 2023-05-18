@@ -1,0 +1,1 @@
+{"version":3,"file":"static/js/9928.30fee8b7.chunk.js","mappings":"0MAMA,UALuB,WACnB,OACI,uBAEP,C","sources":["components/SubAdminImport.js"],"sourcesContent":["import React from \"react\";\r\nconst SubAdminImport = ()=> {\r\n    return(\r\n        <></>\r\n    )\r\n}\r\nexport default SubAdminImport;"],"names":[],"sourceRoot":""}
