@@ -19,10 +19,10 @@ def crossings(request):
 
 
 def closures(request):
-    closures = Crossing.objects.filter(status__in=[0, 3]).order_by('id')
+    closures = Crossing.objects.filter(status__in=[0, 3, 2]).order_by('id')
     closures_json = Helpers.parse_crossings_json(closures)
     for item in closures_json:
-        item['status'] = 'closed'
+        item['status'] = item['status'] if item['status'] == 'caution' else 'closed'
     return JsonResponse({'status': 200, 'message': 'Request Successfull!', 'totalResult': closures.count(), 'attributes': closures_json})
 
 
