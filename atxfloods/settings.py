@@ -99,9 +99,9 @@ DATABASES = {
 
         'USER': 'postgres',
 
-        'PASSWORD': 'igi123',
+        'PASSWORD': 'VitaminC3#',
 
-        'HOST': '127.0.0.1',
+        'HOST': 'atxfloods-database-postgres.cdduygz6mfbn.us-east-1.rds.amazonaws.com',
 
         'PORT': '5432',
 
