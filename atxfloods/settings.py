@@ -33,6 +33,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 
 INSTALLED_APPS = [
+    'channels',
     'corsheaders',
     'django_crontab',
     'admin.apps.AdminConfig',
@@ -44,7 +45,11 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'django.contrib.staticfiles'
 ]
-
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
 CRONJOBS = [
     ('*/1 * * * *', 'admin.cron.walk_through_history', '>> ./cron.log'),
     ('*/1 * * * *', 'admin.cron.camera_notification', '>> ./cron.log')
@@ -94,9 +99,9 @@ DATABASES = {
 
         'USER': 'postgres',
 
-        'PASSWORD': 'VitaminC3#',
+        'PASSWORD': 'igi123',
 
-        'HOST': 'atxfloods-database-postgres.cdduygz6mfbn.us-east-1.rds.amazonaws.com',
+        'HOST': '127.0.0.1',
 
         'PORT': '5432',
 

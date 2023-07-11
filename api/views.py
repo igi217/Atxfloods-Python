@@ -73,3 +73,8 @@ def create_trafic(request):
     trafic = Trafic()
     trafic.save()
     return JsonResponse({'status': True})
+def traffic(request):
+    traffics = Trafic.objects.all()
+    payload = Helpers.JsonParse(traffics, ["id", "session_id", "location", "ip_address", "page", "created_at"])
+
+    return JsonResponse({'status': True, 'data': payload})

@@ -4,14 +4,14 @@ from django.contrib.auth.models import Permission
 from django.core import serializers
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Subquery
 from atxfloods.settings import MEDIA_ROOT
 from .helpers import Helpers, auth, handle_csv_import
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User, update_last_login
 from django.contrib.contenttypes.models import ContentType
-from .models import Crossing, Camera, Image, Contact, Static, Role, CrossingHistory, CameraNotification, Trafic
+from .models import Jurisdiction, Crossing, Camera, Image, Contact, Static, Role, CrossingHistory, CameraNotification, Trafic
 import datetime
 import pytz
 
@@ -31,7 +31,7 @@ def camera_report(request):
         return JsonResponse({'status': 500, 'message': 'Validation Failed', 'errors': validator}, status=500)
     check_date = json_body['date']
     cameras = Camera.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon) | Q(display_status = False)).order_by('id')
+        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon) | Q(display_status=False)).order_by('id')
     per_page = request.GET.get('per_page') or cameras.count()
     page_number = request.GET.get('page_number') or 1
     paginator = Paginator(cameras, per_page)
@@ -140,6 +140,7 @@ def all_notification(request):
 
     return JsonResponse({'status': 200, 'message': 'Request Successfull!', 'data': json_body, 'totalResult': cameranotification.count()})
 
+
 @csrf_exempt
 @auth
 def all_notification_others(request):
@@ -198,7 +199,7 @@ def crossing_history(request):
     page_obj = paginator.get_page(page_number)
     json_body = Helpers.serialize_crossing_history(page_obj, request.user)
 
-    return JsonResponse({'status': 200, 'message': 'Request Success','total': crossing_history.count(), 'data': json_body})
+    return JsonResponse({'status': 200, 'message': 'Request Success', 'total': crossing_history.count(), 'data': json_body})
 
 
 @csrf_exempt
@@ -406,7 +407,7 @@ def login(request):
                         password=credentials['password'])
     if user is not None:
         # Updating Last_Login
-        
+
         # Token
         token = request.body.decode("utf-8")
         token_bytes = token.encode('ascii')
@@ -429,7 +430,7 @@ def login(request):
         response_body['last_login'] = user.last_login
 
         update_last_login(None, user=user)
-        
+
         return JsonResponse(response_body)
     # Auth failed
     response_body = {}
@@ -595,7 +596,7 @@ def export_crossing(request):
 
 @auth
 def closures(request):
-    closures = Crossing.objects.filter(Q(status=0) | Q(status=3) & Q(lat__lte=request.user.max_lat) & Q(
+    closures = Crossing.objects.filter(Q(status__in=[0, 2, 3]) & Q(lat__lte=request.user.max_lat) & Q(
         lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
     per_page = request.GET.get('per_page') or 10
     page_number = request.GET.get('page_number') or 1
@@ -665,7 +666,8 @@ def cameras_create(request):
         unique_id=request_body['unique_id'],
         display_status=('display_status' in request_body),
         lat=request_body['lat'],
-        lon=request_body['lon']
+        lon=request_body['lon'],
+        jurisdiction=request_body['jurisdiction']
     )
     camera.save()
     return JsonResponse({'status': 200, 'message': 'New Record Created!'})
@@ -694,6 +696,7 @@ def cameras_update(request, id):
     camera.display_status = ('display_status' in request_body)
     camera.lat = request_body['lat']
     camera.lon = request_body['lon']
+    camera.jurisdiction = request_body['jurisdiction']
 
     camera.save()
 
@@ -749,18 +752,74 @@ def get_static(request, name):
     }
     return JsonResponse({'status': 200, 'data': data})
 
-def trafic_stat(request):
-    zone = pytz.timezone('US/Eastern')
-    now = datetime.datetime.now(zone)
-    onedaybefore = now - datetime.timedelta(days=1)
-    oneweekbefore = now - datetime.timedelta(days=7)
-    onemonthbefore = now - datetime.timedelta(days=30)
 
-    daycount = Trafic.objects.filter(created_at__range=[onedaybefore, now]).count()
-    weekcount = Trafic.objects.filter(created_at__range=[oneweekbefore, now]).count()
-    monthcount = Trafic.objects.filter(created_at__range=[onemonthbefore, now]).count()
-    allcount = Trafic.objects.all().count()
-    return JsonResponse({'status': 200, 'day': daycount, 'week': weekcount, 'month': monthcount, 'all': allcount})
+@csrf_exempt
+def access_details(request):
+    request_body = json.loads(request.body.decode("utf-8"))
+
+    traffics = Trafic.objects\
+        .filter(eval(request_body.get("query")))\
+        .order_by("-id")
+    per_page = request.GET.get('per_page') or traffics.count()
+    page_number = request.GET.get('page_number') or 1
+
+    paginator = Paginator(traffics, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    payload = Helpers.JsonParse(page_obj, [
+                                "id", "session_id", "location", "ip_address", "page", "created_at", "closed_at"])
+
+    return JsonResponse({'status': 200, 'data': payload, 'total': traffics.count()})
+
+
+@csrf_exempt
+def trafic_stat(request):
+    request_body = json.loads(request.body.decode("utf-8"))
+
+    traffics = Trafic.objects.filter(
+        pk__in=Subquery(Trafic.objects
+                        .filter(eval(request_body.get("query")))
+                        .order_by("session_id", "id").distinct('session_id').values('pk'))
+    ).order_by("-id")
+    if traffics.count() == 0:
+        return JsonResponse({'status': 200, 'data': [], 'total': 0})
+    per_page = request.GET.get('per_page') or traffics.count()
+    page_number = request.GET.get('page_number') or 1
+    traffics = Helpers.addIncreamentalKey(traffics)
+    paginator = Paginator(traffics, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    payload = Helpers.JsonParse(page_obj, [
+                                "id", "session_id", "location", "ip_address", "page", "created_at", "closed_at"])
+
+    return JsonResponse({'status': 200, 'data': payload, 'total': traffics.count()})
+    # zone = pytz.timezone('US/Eastern')
+    # now = datetime.datetime.now(zone)
+    # onedaybefore = now - datetime.timedelta(days=1)
+    # oneweekbefore = now - datetime.timedelta(days=7)
+    # onemonthbefore = now - datetime.timedelta(days=30)
+
+    # daycount = Trafic.objects.filter(
+    #     created_at__range=[onedaybefore, now]).count()
+    # weekcount = Trafic.objects.filter(
+    #     created_at__range=[oneweekbefore, now]).count()
+    # monthcount = Trafic.objects.filter(
+    #     created_at__range=[onemonthbefore, now]).count()
+    # traffics = Trafic.objects.filter(
+    #     pk__in = Subquery(Trafic.objects.all().order_by("session_id", "id").distinct('session_id').values('pk'))
+    # ).order_by("-id")
+    # allcount = Trafic.objects.all().count()
+
+    # per_page = request.GET.get('per_page') or traffics.count()
+    # page_number = request.GET.get('page_number') or 1
+
+    # paginator = Paginator(traffics, per_page)
+    # page_obj = paginator.get_page(page_number)
+
+    # payload = Helpers.JsonParse(page_obj, ["id", "session_id", "location", "ip_address", "page", "created_at", "closed_at"])
+
+    # return JsonResponse({'status': 200, 'day': daycount, 'week': weekcount, 'month': monthcount, 'all': allcount, 'data': payload})
+
 
 @csrf_exempt
 def image_upload(request):
@@ -788,6 +847,78 @@ def image_upload(request):
         print('camers not exists')
 
     return JsonResponse({'status': 200, 'message': 'Record Updated'})
+
+
+@csrf_exempt
+def create_jurisdiction(request):
+    try:
+        request_body: dict = json.loads(request.body.decode("utf-8"))
+        jurisdiction_get = Jurisdiction.objects.filter(
+            short_name=request_body.get("short_name")).count()
+        if jurisdiction_get > 0:
+            return JsonResponse({'status': 500, 'message': 'Duplicate Abbreviation. Please make sure to use an unique Abbreviation!'}, status=500)
+        jurisdiction = Jurisdiction(
+            name=request_body.get("name"),
+            short_name=request_body.get("short_name"),
+            max_lat=request_body.get("max_lat"),
+            min_lat=request_body.get("min_lat"),
+            max_lon=request_body.get("max_lon"),
+            min_lon=request_body.get("min_lon")
+        )
+        jurisdiction.save()
+        return JsonResponse({'status': 200, 'message': 'Jurisdiction Create Successfuly'})
+    except Exception as err:
+        return JsonResponse({'status': 500, 'message': str(err)}, status=500)
+
+
+@auth
+def list_jurisdiction(request):
+    jurisdictions = Jurisdiction.objects.filter(Q(max_lat__lte=request.user.max_lat) & Q(
+        min_lat__gte=request.user.min_lat) & Q(max_lon__lte=request.user.max_lon) & Q(min_lon__gte=request.user.min_lon))
+
+    per_page = request.GET.get('per_page') or jurisdictions.count()
+    page_number = request.GET.get('page_number') or 1
+
+    paginator = Paginator(jurisdictions, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    json_body = Helpers.JsonParse(page_obj, [
+                                  "id", "name", "short_name", "min_lat", "max_lat", "min_lon", "max_lon", "created_at", "updated_at"])
+
+    return JsonResponse({'status': 200, 'data': json_body, 'total': jurisdictions.count()})
+
+
+@csrf_exempt
+def update_jurisdiction(request, id):
+    try:
+        request_body: dict = json.loads(request.body.decode("utf-8"))
+        jurisdiction_get = Jurisdiction.objects.filter(
+            short_name=request_body.get("short_name")).count()
+
+        jurisdiction = Jurisdiction.objects.get(id=id)
+        if jurisdiction_get > 0 and request_body.get("short_name") != jurisdiction.short_name:
+            return JsonResponse({'status': 500, 'message': 'Duplicate Abbreviation. Please make sure to use an unique Abbreviation!'}, status=500)
+        jurisdiction.name = request_body.get("name")
+        jurisdiction.short_name = request_body.get("short_name")
+        jurisdiction.max_lat = request_body.get("max_lat")
+        jurisdiction.min_lat = request_body.get("min_lat")
+        jurisdiction.max_lon = request_body.get("max_lon")
+        jurisdiction.min_lon = request_body.get("min_lon")
+        jurisdiction.save(update_fields=[
+                          'name', 'short_name', 'max_lat', 'min_lat', 'max_lon', 'min_lon'])
+        return JsonResponse({'status': 200, 'message': 'Jurisdiction Create Successfuly'})
+    except Exception as err:
+        return JsonResponse({'status': 500, 'message': str(err)}, status=500)
+
+
+def delete_jurisdiction(request, id):
+    try:
+        jurisdiction = Jurisdiction(id=id)
+        jurisdiction.delete()
+
+        return JsonResponse({'status': 200, 'message': 'Jurisdiction Deleted'})
+    except Exception as err:
+        return JsonResponse({'status': 200, 'message': str(err)}, status=500)
 
 
 def handle_uploaded_file(file, name):

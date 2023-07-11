@@ -47,5 +47,10 @@ urlpatterns = [
     path('roles/create', views.create_roles, name='admin.create'),
     path('roles/update/<int:id>', views.update_roles, name='admin.update'),
     path('roles/delete/<int:id>', views.delete_roles, name='admin.delete'),
-    path('trafic', views.trafic_stat, name='admin.trafic')
+    path('trafic', views.trafic_stat, name='admin.trafic'),
+    path("jurisdiction", views.list_jurisdiction),
+    path("jurisdiction/create", views.create_jurisdiction),
+    path("jurisdiction/update/<int:id>", views.update_jurisdiction),
+    path("jurisdiction/delete/<int:id>", views.delete_jurisdiction),
+    path("access-details", views.access_details)
 ]

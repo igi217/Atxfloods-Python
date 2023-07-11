@@ -1,8 +1,9 @@
+from typing import List
 from django.http import JsonResponse
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import Permission
 from django.core.files.storage import FileSystemStorage
-from .models import CameraNotification, Crossing, Image, Role, CrossingHistory, Camera
+from .models import Trafic, Crossing, Image, Role, CrossingHistory, Camera
 from django.db.models import Q
 from django.core import serializers
 from django.contrib.auth.models import User
@@ -14,7 +15,21 @@ import base64
 
 
 class Helpers:
+    def addIncreamentalKey(querySet: List[Trafic]):
+        
+        for (index, item) in enumerate(querySet):
+            item.id = (querySet.count() -index)
+            
+        return querySet
+    def JsonParse(obj: List[object], values: List[str]):
+        resultJson = []
 
+        for item in obj:
+            tmpDict = {}
+            for key in values:
+                tmpDict[key] = item.__getattribute__(key)
+            resultJson.append(tmpDict)
+        return resultJson
     def prepare_camera_report(cameras, date):
         start_time = datetime.datetime.combine(datetime.datetime.strptime(date, "%Y-%m-%d").date(), datetime.datetime.min.time())
         end_time = datetime.datetime.combine(datetime.datetime.strptime(date, "%Y-%m-%d").date(), datetime.datetime.max.time())
@@ -145,6 +160,7 @@ class Helpers:
                 }
             else:
                 crossing_detail = 'Not Found'
+                continue
 
             user = User.objects.filter(id=history.user_id).first()
             if user != None:
@@ -320,6 +336,7 @@ class Helpers:
                 'unique_id': camera.unique_id,
                 'name': camera.name,
                 'address': camera.address,
+                'jurisdiction': camera.jurisdiction,
                 'lat': camera.lat,
                 'lon': camera.lon,
                 'updated_at': camera.updated_at,
