@@ -30,8 +30,7 @@ def camera_report(request):
     if len(validator) != 0:
         return JsonResponse({'status': 500, 'message': 'Validation Failed', 'errors': validator}, status=500)
     check_date = json_body['date']
-    cameras = Camera.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon) | Q(display_status=False)).order_by('id')
+    cameras = Camera.objects.filter(Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "") | Q(display_status=False)).order_by('id')
     per_page = request.GET.get('per_page') or cameras.count()
     page_number = request.GET.get('page_number') or 1
     paginator = Paginator(cameras, per_page)
@@ -265,12 +264,9 @@ def delete_roles(request, id):
 
 @auth
 def count(request):
-    crossing_count = Crossing.objects.filter(Q(lat__lte=request.user.max_lat) & Q(
-        lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).count()
-    closures_count = Crossing.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon) & Q(status=0) | Q(status=3)).count()
-    camera_count = Camera.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).count()
+    crossing_count = Crossing.objects.filter(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "").count()
+    closures_count = Crossing.objects.filter(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "", status__in=[0, 2, 3]).count()
+    camera_count = Camera.objects.filter(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "").count()
 
     return JsonResponse({'status': 200, 'data': {
         'totalCrossing': crossing_count,
@@ -480,17 +476,15 @@ def all_crossings(request):
     status = request.GET.get('status')
     search = request.GET.get('search')
     if not status and not search:
-        crossings = Crossing.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-            lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+        crossings = Crossing.objects.filter(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "").order_by('id')
     elif status and not search:
-        crossings = Crossing.objects.filter(Q(status=int(status)) & Q(lat__lte=request.user.max_lat) & Q(
-            lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+        crossings = Crossing.objects.filter(Q(status=int(status)) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     elif status and search:
         crossings = Crossing.objects.filter(Q(name__icontains=search) | Q(
-            address__icontains=search) & Q(status=int(status)) & Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+            address__icontains=search) & Q(status=int(status)) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     elif not status and search:
         crossings = Crossing.objects.filter(
-            Q(name__icontains=search) | Q(address__icontains=search) & Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+            Q(name__icontains=search) | Q(address__icontains=search) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     paginator = Paginator(crossings, per_page)
     page_obj = paginator.get_page(page_number)
     crossings_json = Helpers.parse_crossings_json(page_obj)
@@ -582,8 +576,7 @@ def import_crossing(request):
 @csrf_exempt
 @auth
 def export_crossing(request):
-    crossings = Crossing.objects.filter(Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+    crossings = Crossing.objects.filter(Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     status_dict = {0: 'off', 1: 'on', 2: 'caution', 3: 'Longtime closure'}
     csv_str = 'Name,Jusrisdiction,Address,Latitude,Longitude,Status,Comment,Id \n'
     for crossing in crossings:
@@ -596,8 +589,7 @@ def export_crossing(request):
 
 @auth
 def closures(request):
-    closures = Crossing.objects.filter(Q(status__in=[0, 2, 3]) & Q(lat__lte=request.user.max_lat) & Q(
-        lat__gte=request.user.min_lat) & Q(lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)).order_by('id')
+    closures = Crossing.objects.filter(Q(status__in=[0, 2, 3]) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     per_page = request.GET.get('per_page') or 10
     page_number = request.GET.get('page_number') or 1
 
@@ -611,8 +603,7 @@ def closures(request):
 
 @auth
 def cameras(request):
-    cameras = Camera.objects.filter((Q(lat__lte=request.user.max_lat) & Q(lat__gte=request.user.min_lat) & Q(
-        lon__lte=request.user.max_lon) & Q(lon__gte=request.user.min_lon)) | Q(display_status=False)).order_by('id')
+    cameras = Camera.objects.filter((Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")) | Q(display_status=False)).order_by('id')
     per_page = request.GET.get('per_page') or cameras.count()
     page_number = request.GET.get('page_number') or 1
     total_images = request.GET.get('total_images') or -1
