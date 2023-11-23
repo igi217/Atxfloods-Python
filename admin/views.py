@@ -606,7 +606,7 @@ def cameras(request):
     cameras = Camera.objects.filter((Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")) | Q(display_status=False)).order_by('id')
     per_page = request.GET.get('per_page') or cameras.count()
     page_number = request.GET.get('page_number') or 1
-    total_images = request.GET.get('total_images') or -1
+    total_images = request.GET.get('total_images') or 0
     paginator = Paginator(cameras, per_page)
     page_obj = paginator.get_page(page_number)
     camera_json = Helpers.parse_cameras_json(
