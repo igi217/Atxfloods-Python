@@ -347,6 +347,8 @@ class AbstractUser(AbstractBaseUser, PermissionsMixin):
     min_lat = models.FloatField(null=True)
     max_lon = models.FloatField(null=True)
     min_lon = models.FloatField(null=True)
+    admin_type = models.TextField(null = True)
+    visible_password = models.TextField(null = True, blank = True)
     is_staff = models.BooleanField(
         _('staff status'),
         default=False,

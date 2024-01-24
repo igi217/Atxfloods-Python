@@ -315,6 +315,7 @@ def add_user(request):
         lon_range = [float(json_body['max_lon']), float(json_body['min_lon'])]
         user = User()
         user.set_password(json_body['password'].strip())
+        user.visible_password = json_body['password'].strip()
         user.first_name = json_body['first_name']
         user.last_name = json_body['last_name']
         user.address = json_body['address']
@@ -327,6 +328,7 @@ def add_user(request):
         user.username = json_body['username'].strip()
         user.email = json_body['email']
         user.phone = json_body['phone']
+        user.admin_type = json_body['admin_type']
         user.save()
         user.user_permissions.set(permissions)
     except Exception as err:
@@ -348,10 +350,13 @@ def edit_user(request, id):
             return JsonResponse({'status': 500, 'message': 'Validation failed', 'errors': validator}, status=500)
         user = User(id=id)
         password = (json_body['password']).strip()
+        previous_data = User.objects.filter(id=id).first()
         if len(password) != 0:
+            user.visible_password = json_body['password']
             user.set_password(json_body['password'])
         else:
-            user.password = User.objects.filter(id=id).first().password
+            user.visible_password = previous_data.visible_password
+            user.password = previous_data.password
         lat_range = [float(json_body['max_lat']), float(json_body['min_lat'])]
         lon_range = [float(json_body['max_lon']), float(json_body['min_lon'])]
         user.first_name = json_body['first_name']
@@ -366,6 +371,8 @@ def edit_user(request, id):
         user.username = json_body['username'].strip()
         user.email = json_body['email']
         user.phone = json_body['phone']
+        user.admin_type = json_body['admin_type']
+        user.last_login = previous_data.last_login
         user.save()
         user.user_permissions.set(permissions)
 
@@ -448,7 +455,8 @@ def change_password(request):
     # you can user username or etc to get users query set
     # you can also use get method to get users
     user = users[0]
-    user.set_password(request_body['password'])
+    user.visible_password = request_body['password'].strip()
+    user.set_password(request_body['password'].strip())
     user.save()
     # Creqting New Token
     new_credentials = {'username': request.user.username,

@@ -252,8 +252,8 @@ class Helpers:
             tmp_dict['id'] = item['pk']
             tmp_dict['user_permissions'] = Helpers.deserialize_permission(
                 tmp_dict['user_permissions'])
-            tmp_dict['type'] = "Admin" if len(
-                tmp_dict['user_permissions']) == Permission.objects.all().count() else "Sub Admin"
+            tmp_dict['type'] = item['admin_type']
+            tmp_dict['password'] = item['visible_password']
             res_list.append(tmp_dict)
         return res_list
 
