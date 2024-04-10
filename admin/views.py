@@ -489,10 +489,10 @@ def all_crossings(request):
         crossings = Crossing.objects.filter(Q(status=int(status)) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     elif status and search:
         crossings = Crossing.objects.filter(Q(name__icontains=search) | Q(
-            address__icontains=search) & Q(status=int(status)) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
+            address__icontains=search) | jurisdiction__icontains=search) & Q(status=int(status)) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     elif not status and search:
         crossings = Crossing.objects.filter(
-            Q(name__icontains=search) | Q(address__icontains=search) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
+            Q(name__icontains=search) | Q(address__icontains=search) | jurisdiction__icontains=search) & Q(jurisdiction__icontains=request.user.jurisdiction if request.user.jurisdiction != "all" else "")).order_by('id')
     paginator = Paginator(crossings, per_page)
     page_obj = paginator.get_page(page_number)
     crossings_json = Helpers.parse_crossings_json(page_obj)
